@@ -6,6 +6,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 
 namespace CloudDancerCommon
 {
@@ -15,7 +16,7 @@ namespace CloudDancerCommon
         public const Int32 CurrentVersion = 1;
         public string Name { get; private set; }
         public Int32 Version { get; private set; }
-        public IPAddress Address { get; private set; }
+        public string Address { get; private set; }
         public Int32 Port { get; private set; }
         public bool IsSelf { get; private set; }
         private Server(){}
@@ -27,58 +28,28 @@ namespace CloudDancerCommon
             {
                 Name = Environment.MachineName,
                 Version = CurrentVersion,
-                Address = host.AddressList.First(ip => ip.AddressFamily == family),
+                Address = host.AddressList.First(ip => ip.AddressFamily == family).ToString(),
                 Port = DefaultPort,
                 IsSelf = true
             };
             return self;
         }
 
-        private bool anouncing = false;
-        public void BeginAnnounce(TimeSpan interval)
+        // ReSharper disable once InconsistentNaming
+        public string toJSON()
         {
-            if (anouncing) return;
-            anouncing = true;
-            var task = new Thread(() =>
-            {
-                var udp = new UdpClient();
-                var endpoint = new IPEndPoint(IPAddress.Broadcast, Port);
-                var message = GetPayload();
-                while (anouncing)
-                {
-                    udp.Send(message, message.Length, endpoint);
-                    Thread.Sleep(interval);
-                }
-            });
-            task.Start();
+            return JsonConvert.SerializeObject(this);
         }
 
-        public void EndAnnounce()
+        public override string ToString()
         {
-            anouncing = false;
-        }
-        private byte[] getBytes(int number)
-        {
-            var bytes = BitConverter.GetBytes(number);
-            if (BitConverter.IsLittleEndian)
-            {
-                Array.Reverse(bytes);
-            }
-            return bytes;
+            return toJSON();
         }
 
-        private byte[] GetPayload()
+        // ReSharper disable once InconsistentNaming
+        public static Server fromJSON(string json)
         {
-            var nullByte = new byte[] {0};
-            IEnumerable<byte> payload = nullByte;
-            payload = payload.Concat(Encoding.UTF8.GetBytes(Name));
-            payload = payload.Concat(nullByte);
-            payload = payload.Concat(getBytes(Version));
-            payload = payload.Concat(nullByte); 
-            payload = payload.Concat(Encoding.UTF8.GetBytes(Address.ToString()));
-            payload = payload.Concat(nullByte);
-            payload = payload.Concat(getBytes(Port));
-            return payload.ToArray();
+            return JsonConvert.DeserializeObject<Server>(json);
         }
     }
 }
